@@ -1,5 +1,9 @@
+use crate::redis_type::RedisType;
 use anyhow::Result;
-use std::{io::Read, net::TcpStream};
+use std::{
+    io::{Read, Write},
+    net::{Shutdown, TcpStream},
+};
 
 pub struct Connection {
     stream: TcpStream,
@@ -7,7 +11,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream) -> Self {
+    pub const fn new(stream: TcpStream) -> Self {
         Self {
             stream,
             buffer: Vec::new(),
@@ -36,6 +40,20 @@ impl Connection {
         if let Ok(request) = String::from_utf8(self.buffer.clone()) {
             dbg!(request);
         }
+
+        let request = RedisType::try_from(self.buffer.as_slice())?;
+        let response = match request {
+            RedisType::Array(array) if array.contains(&RedisType::BulkString(b"PING")) => {
+                RedisType::SimpleString("PONG")
+            }
+            _ => RedisType::SimpleError("ERR unknown command"),
+        }
+        .encode();
+        if let Ok(response) = String::from_utf8(response.clone()) {
+            dbg!(response);
+        }
+        self.stream.write_all(response.as_slice())?;
+        self.stream.shutdown(Shutdown::Both)?;
 
         Ok(())
     }
