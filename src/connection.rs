@@ -1,3 +1,4 @@
+use crate::redis_type::RedisType;
 use anyhow::Result;
 use std::{io::Read, net::TcpStream};
 
@@ -7,7 +8,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(stream: TcpStream) -> Self {
+    pub const fn new(stream: TcpStream) -> Self {
         Self {
             stream,
             buffer: Vec::new(),
@@ -36,6 +37,9 @@ impl Connection {
         if let Ok(request) = String::from_utf8(self.buffer.clone()) {
             dbg!(request);
         }
+
+        let request = RedisType::try_from(self.buffer.as_slice())?;
+        dbg!(request);
 
         Ok(())
     }
