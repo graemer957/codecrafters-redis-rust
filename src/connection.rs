@@ -26,7 +26,7 @@ impl Connection {
                 println!("read {read} bytes from stream");
 
                 if read == 0 {
-                    if buffer.is_empty() {
+                    if buffer == [0; 1024] {
                         println!("no commands left from client, shutting down connection");
                         break 'command;
                     }
