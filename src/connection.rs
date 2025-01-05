@@ -52,6 +52,13 @@ impl Connection {
                 RedisType::Array(array) if array.contains(&RedisType::BulkString(b"PING")) => {
                     RedisType::SimpleString("PONG")
                 }
+                RedisType::Array(array) if array.starts_with(&[RedisType::BulkString(b"ECHO")]) => {
+                    if let Some(RedisType::BulkString(element)) = array.get(1) {
+                        RedisType::BulkString(element)
+                    } else {
+                        RedisType::SimpleError("ERR nothing to echo back")
+                    }
+                }
                 _ => RedisType::SimpleError("ERR unknown command"),
             }
             .encode();

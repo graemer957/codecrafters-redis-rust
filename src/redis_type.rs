@@ -23,7 +23,13 @@ impl RedisType<'_> {
                 value.extend(error.as_bytes());
                 value.extend(b"\r\n");
             }
-            RedisType::BulkString(_) => todo!(),
+            RedisType::BulkString(bulk) => {
+                value.extend(b"$");
+                value.extend(format!("{}", bulk.len()).as_bytes());
+                value.extend(b"\r\n");
+                value.extend(*bulk);
+                value.extend(b"\r\n");
+            }
             RedisType::Array(_vec) => todo!(),
         }
 
