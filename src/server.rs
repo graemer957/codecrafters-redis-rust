@@ -26,7 +26,9 @@ impl Server {
             let mut connection = Connection::new(stream);
             pool.execute(move || {
                 // TODO: No support for `Result` in current `ThreadPool` implementation
-                let _ = connection.process();
+                if let Err(error) = connection.process() {
+                    eprintln!("Connection error: {error}");
+                }
             });
         }
     }
