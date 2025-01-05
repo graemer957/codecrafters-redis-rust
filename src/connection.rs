@@ -59,7 +59,7 @@ impl Connection {
                 dbg!(response);
             }
             self.stream.write_all(response.as_slice())?;
-            self.buffer.drain(0..);
+            self.buffer.drain(..);
         }
         self.stream.shutdown(Shutdown::Both)?;
 
