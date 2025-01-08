@@ -1,5 +1,6 @@
-mod connection;
-mod redis_type;
+mod client;
+mod command;
+mod resp_data_types;
 mod server;
 mod threadpool;
 

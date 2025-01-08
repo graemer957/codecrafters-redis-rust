@@ -1,5 +1,4 @@
-use crate::connection::Connection;
-use crate::threadpool::ThreadPool;
+use crate::{client::Client, threadpool::ThreadPool};
 use anyhow::Result;
 use std::net::TcpListener;
 
@@ -20,14 +19,14 @@ impl Server {
         let pool = ThreadPool::new(4);
 
         loop {
-            let (stream, client) = self.listener.accept()?;
-            dbg!(client);
+            let (stream, client_addr) = self.listener.accept()?;
+            dbg!(client_addr);
 
-            let mut connection = Connection::new(stream);
             pool.execute(move || {
+                let mut client = Client::new(stream);
                 // TODO: No support for `Result` in current `ThreadPool` implementation
-                if let Err(error) = connection.process() {
-                    eprintln!("Connection error: {error}");
+                if let Err(error) = client.handle() {
+                    eprintln!("Client error: {error}");
                 }
             });
         }

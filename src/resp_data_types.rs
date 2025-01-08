@@ -1,39 +1,57 @@
 use std::str;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum RedisType<'a> {
-    SimpleString(&'a str),
-    SimpleError(&'a str),
-    BulkString(&'a [u8]),
-    Array(Vec<RedisType<'a>>),
+pub struct SimpleError<'a> {
+    inner: &'a str,
 }
 
-impl RedisType<'_> {
-    pub fn encode(&self) -> Vec<u8> {
-        let mut value = Vec::new();
+impl SimpleError<'_> {
+    pub const fn new(inner: &str) -> SimpleError<'_> {
+        SimpleError { inner }
+    }
 
+    pub fn encode(&self) -> Vec<u8> {
+        // 1 for type
+        // 2 for terminator
+        let mut value = Vec::with_capacity(1 + self.inner.len() + 2);
+        value.push(b'-');
+        value.extend_from_slice(self.inner.as_bytes());
+        value.extend_from_slice(b"\r\n");
+
+        value
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum RESPDataType<'a> {
+    SimpleString(&'a str),
+    SimpleError(SimpleError<'a>),
+    BulkString(&'a [u8]),
+    Array(Vec<RESPDataType<'a>>),
+}
+
+impl RESPDataType<'_> {
+    pub fn encode(&self) -> Vec<u8> {
         match self {
-            RedisType::SimpleString(string) => {
+            RESPDataType::SimpleString(string) => {
+                let mut value = Vec::new();
                 value.extend(b"+");
                 value.extend(string.as_bytes());
                 value.extend(b"\r\n");
+                value
             }
-            RedisType::SimpleError(error) => {
-                value.extend(b"-");
-                value.extend(error.as_bytes());
-                value.extend(b"\r\n");
-            }
-            RedisType::BulkString(bulk) => {
+            RESPDataType::SimpleError(error) => error.encode(),
+            RESPDataType::BulkString(bulk) => {
+                let mut value = Vec::new();
                 value.extend(b"$");
                 value.extend(format!("{}", bulk.len()).as_bytes());
                 value.extend(b"\r\n");
                 value.extend(*bulk);
                 value.extend(b"\r\n");
+                value
             }
-            RedisType::Array(_vec) => todo!(),
+            RESPDataType::Array(_vec) => todo!(),
         }
-
-        value
     }
 }
 
@@ -88,19 +106,22 @@ macro_rules! find_length {
     }};
 }
 
-impl<'a> TryFrom<&'a [u8]> for RedisType<'a> {
+impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
     type Error = Error;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        fn try_with_remaining(value: &[u8]) -> Result<(RedisType, &[u8]), Error> {
+        fn try_with_remaining(value: &[u8]) -> Result<(RESPDataType, &[u8]), Error> {
             match value[0] {
                 b'+' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
-                    Ok((RedisType::SimpleString(result), &value[cr + 2..]))
+                    Ok((RESPDataType::SimpleString(result), &value[cr + 2..]))
                 }),
                 b'-' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
-                    Ok((RedisType::SimpleError(result), &value[cr + 2..]))
+                    Ok((
+                        RESPDataType::SimpleError(SimpleError::new(result)),
+                        &value[cr + 2..],
+                    ))
                 }),
                 b'$' => {
                     let (length, remaining) = find_crlf!(value, |cr| find_length!(value, cr))?;
@@ -108,7 +129,7 @@ impl<'a> TryFrom<&'a [u8]> for RedisType<'a> {
                     find_crlf!(remaining, |cr| {
                         let value = &remaining[..cr];
                         if value.len() == length as usize {
-                            Ok((RedisType::BulkString(value), &remaining[cr + 2..]))
+                            Ok((RESPDataType::BulkString(value), &remaining[cr + 2..]))
                         } else {
                             Err(Error::InvalidLength)
                         }
@@ -125,7 +146,7 @@ impl<'a> TryFrom<&'a [u8]> for RedisType<'a> {
                         remaining = remainder;
                     }
 
-                    Ok((RedisType::Array(elements), remaining))
+                    Ok((RESPDataType::Array(elements), remaining))
                 }
                 _ => Err(Error::UnknownType(char::from(value[0]))),
             }
@@ -151,21 +172,21 @@ mod test {
     #[test]
     fn empty_should_not_have_a_type() {
         let input: &[u8] = b"";
-        assert_eq!(RedisType::try_from(input), Err(Error::EmptyValue))
+        assert_eq!(RESPDataType::try_from(input), Err(Error::EmptyValue))
     }
 
     #[test]
     fn unknown_type_should_fail() {
         let input: &[u8] = b"z\r\n...\r\n";
-        assert_eq!(RedisType::try_from(input), Err(Error::UnknownType('z')));
+        assert_eq!(RESPDataType::try_from(input), Err(Error::UnknownType('z')));
     }
 
     #[test]
     fn parse_simple_string() -> Result<(), Error> {
         let input: &[u8] = b"+OK\r\n";
-        let result = RedisType::try_from(input)?;
+        let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RedisType::SimpleString("OK"));
+        assert_eq!(result, RESPDataType::SimpleString("OK"));
 
         Ok(())
     }
@@ -173,9 +194,9 @@ mod test {
     #[test]
     fn parse_bulk_string() -> Result<(), Error> {
         let input: &[u8] = b"$4\r\nRust\r\n";
-        let result = RedisType::try_from(input)?;
+        let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RedisType::BulkString(b"Rust"));
+        assert_eq!(result, RESPDataType::BulkString(b"Rust"));
 
         Ok(())
     }
@@ -184,7 +205,7 @@ mod test {
     fn invalid_u32() {
         let input: &[u8] = b"$h\r\nhello\r\n";
         assert_eq!(
-            RedisType::try_from(input),
+            RESPDataType::try_from(input),
             Err(Error::InvalidUnsigned32BitNumber)
         );
     }
@@ -192,17 +213,17 @@ mod test {
     #[test]
     fn invalid_length() {
         let input: &[u8] = b"$2\r\nRust\r\n";
-        assert_eq!(RedisType::try_from(input), Err(Error::InvalidLength));
+        assert_eq!(RESPDataType::try_from(input), Err(Error::InvalidLength));
     }
 
     #[test]
     fn parse_array_same_type() -> Result<(), Error> {
         let input: &[u8] = b"*1\r\n$4\r\nPING\r\n";
-        let result = RedisType::try_from(input)?;
+        let result = RESPDataType::try_from(input)?;
 
         assert_eq!(
             result,
-            RedisType::Array(vec![RedisType::BulkString(b"PING")])
+            RESPDataType::Array(vec![RESPDataType::BulkString(b"PING")])
         );
 
         Ok(())
@@ -211,13 +232,13 @@ mod test {
     #[test]
     fn parse_array_mixed_type() -> Result<(), Error> {
         let input: &[u8] = b"*2\r\n$4\r\nPING\r\n+OK\r\n";
-        let result = RedisType::try_from(input)?;
+        let result = RESPDataType::try_from(input)?;
 
         assert_eq!(
             result,
-            RedisType::Array(vec![
-                RedisType::BulkString(b"PING"),
-                RedisType::SimpleString("OK")
+            RESPDataType::Array(vec![
+                RESPDataType::BulkString(b"PING"),
+                RESPDataType::SimpleString("OK")
             ])
         );
 
@@ -227,29 +248,32 @@ mod test {
     #[test]
     fn extra_bytes() {
         let input: &[u8] = b"+Sure\r\njunk...";
-        assert_eq!(RedisType::try_from(input), Err(Error::ExtraBytes));
+        assert_eq!(RESPDataType::try_from(input), Err(Error::ExtraBytes));
     }
 
     #[test]
     fn invalid_utf8_in_simple_string() {
         // Invalid UTF-8 starting with + and finishing with \r\n
         let input: &[u8] = &[0x2B, 0xF0, 0x28, 0x8C, 0x28, 0x0D, 0x0A];
-        assert_eq!(RedisType::try_from(input), Err(Error::InvalidUTF8));
+        assert_eq!(RESPDataType::try_from(input), Err(Error::InvalidUTF8));
     }
 
     #[test]
     fn invalid_utf8_in_length() {
         // Invalid UTF-8 starting with $2 and finishing with \r\n
         let input: &[u8] = &[0x24, 0x32, 0xF0, 0x28, 0x8C, 0x28, 0x0D, 0x0A];
-        assert_eq!(RedisType::try_from(input), Err(Error::InvalidUTF8));
+        assert_eq!(RESPDataType::try_from(input), Err(Error::InvalidUTF8));
     }
 
     #[test]
     fn parse_simple_error() -> Result<(), Error> {
         let input: &[u8] = b"-ERR unknown command 'asdf'\r\n";
-        let result = RedisType::try_from(input)?;
+        let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RedisType::SimpleError("ERR unknown command 'asdf'"));
+        assert_eq!(
+            result,
+            RESPDataType::SimpleError(SimpleError::new("ERR unknown command 'asdf'"))
+        );
 
         Ok(())
     }
