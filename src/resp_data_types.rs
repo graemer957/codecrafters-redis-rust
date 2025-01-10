@@ -1,4 +1,4 @@
-use std::str;
+use std::{collections::VecDeque, str};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SimpleError<'a> {
@@ -23,36 +23,61 @@ impl SimpleError<'_> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum RESPDataType<'a> {
-    SimpleString(&'a str),
-    SimpleError(SimpleError<'a>),
-    BulkString(&'a [u8]),
-    Array(Vec<RESPDataType<'a>>),
+pub struct SimpleString<'a> {
+    inner: &'a str,
 }
 
-impl RESPDataType<'_> {
-    pub fn encode(&self) -> Vec<u8> {
-        match self {
-            RESPDataType::SimpleString(string) => {
-                let mut value = Vec::new();
-                value.extend(b"+");
-                value.extend(string.as_bytes());
-                value.extend(b"\r\n");
-                value
-            }
-            RESPDataType::SimpleError(error) => error.encode(),
-            RESPDataType::BulkString(bulk) => {
-                let mut value = Vec::new();
-                value.extend(b"$");
-                value.extend(format!("{}", bulk.len()).as_bytes());
-                value.extend(b"\r\n");
-                value.extend(*bulk);
-                value.extend(b"\r\n");
-                value
-            }
-            RESPDataType::Array(_vec) => todo!(),
-        }
+impl SimpleString<'_> {
+    pub const fn new(inner: &str) -> SimpleString<'_> {
+        SimpleString { inner }
     }
+
+    pub fn encode(&self) -> Vec<u8> {
+        // 1 for type
+        // 2 for terminator
+        let mut value = Vec::with_capacity(1 + self.inner.len() + 2);
+        value.push(b'+');
+        value.extend_from_slice(self.inner.as_bytes());
+        value.extend_from_slice(b"\r\n");
+
+        value
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct BulkString<'a> {
+    inner: &'a [u8],
+}
+
+impl BulkString<'_> {
+    pub const fn new(inner: &[u8]) -> BulkString<'_> {
+        BulkString { inner }
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        // TODO: Idiomatic way to convert usize to &[u8]?
+        let mut value = Vec::new();
+        value.extend(b"$");
+        value.extend(format!("{}", self.inner.len()).as_bytes());
+        value.extend(b"\r\n");
+        value.extend(self.inner);
+        value.extend(b"\r\n");
+        value
+    }
+
+    pub fn as_string(&self) -> Option<&str> {
+        std::str::from_utf8(self.inner).ok()
+    }
+}
+
+// This is needed to support the heterogeneous arrays used in RESP
+// See https://redis.io/docs/latest/develop/reference/protocol-spec/#arrays
+#[derive(Debug, PartialEq, Eq)]
+pub enum RESPDataType<'a> {
+    SimpleString(SimpleString<'a>),
+    SimpleError(SimpleError<'a>),
+    BulkString(BulkString<'a>),
+    Array(VecDeque<RESPDataType<'a>>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -114,7 +139,10 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
             match value[0] {
                 b'+' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
-                    Ok((RESPDataType::SimpleString(result), &value[cr + 2..]))
+                    Ok((
+                        RESPDataType::SimpleString(SimpleString::new(result)),
+                        &value[cr + 2..],
+                    ))
                 }),
                 b'-' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
@@ -129,7 +157,10 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
                     find_crlf!(remaining, |cr| {
                         let value = &remaining[..cr];
                         if value.len() == length as usize {
-                            Ok((RESPDataType::BulkString(value), &remaining[cr + 2..]))
+                            Ok((
+                                RESPDataType::BulkString(BulkString::new(value)),
+                                &remaining[cr + 2..],
+                            ))
                         } else {
                             Err(Error::InvalidLength)
                         }
@@ -137,12 +168,12 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
                 }
                 b'*' => {
                     let (length, remaining) = find_crlf!(value, |cr| find_length!(value, cr))?;
-                    let mut elements = Vec::new();
+                    let mut elements = VecDeque::new();
                     let mut remaining = remaining;
 
                     for _ in 1..=length {
                         let (element, remainder) = try_with_remaining(remaining)?;
-                        elements.push(element);
+                        elements.push_back(element);
                         remaining = remainder;
                     }
 
@@ -186,7 +217,7 @@ mod test {
         let input: &[u8] = b"+OK\r\n";
         let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RESPDataType::SimpleString("OK"));
+        assert_eq!(result, RESPDataType::SimpleString(SimpleString::new("OK")));
 
         Ok(())
     }
@@ -196,7 +227,7 @@ mod test {
         let input: &[u8] = b"$4\r\nRust\r\n";
         let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RESPDataType::BulkString(b"Rust"));
+        assert_eq!(result, RESPDataType::BulkString(BulkString::new(b"Rust")));
 
         Ok(())
     }
@@ -223,7 +254,9 @@ mod test {
 
         assert_eq!(
             result,
-            RESPDataType::Array(vec![RESPDataType::BulkString(b"PING")])
+            RESPDataType::Array(VecDeque::from([RESPDataType::BulkString(BulkString::new(
+                b"PING"
+            ))]))
         );
 
         Ok(())
@@ -236,10 +269,10 @@ mod test {
 
         assert_eq!(
             result,
-            RESPDataType::Array(vec![
-                RESPDataType::BulkString(b"PING"),
-                RESPDataType::SimpleString("OK")
-            ])
+            RESPDataType::Array(VecDeque::from([
+                RESPDataType::BulkString(BulkString::new(b"PING")),
+                RESPDataType::SimpleString(SimpleString::new("OK"))
+            ]))
         );
 
         Ok(())

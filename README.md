@@ -42,3 +42,4 @@ project more elegant / reusable / etc, but do not have the time for right now:
 - [ ] `ThreadPool` is taken straight out of the Rust book and should probably look at something
     more battle tested like `Tokio` or `Rayon`
     - No support for `Result` currently, so we are ignoring
+- [ ] What is the idiomatic way to get a `&[u8]` from a `usize`?

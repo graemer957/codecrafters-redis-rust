@@ -1,4 +1,7 @@
-use crate::{command::Command, resp_data_types::RESPDataType};
+use crate::{
+    command::Command,
+    resp_data_types::{RESPDataType, SimpleError, SimpleString},
+};
 use anyhow::Result;
 use std::{
     io::{Read, Write},
@@ -48,12 +51,12 @@ impl Client {
             }
 
             let request: RESPDataType = self.request_buffer.as_slice().try_into()?;
-            let response = match request.try_into() {
-                Ok(Command::Ping) => RESPDataType::SimpleString("PONG"),
-                Ok(Command::Echo(message)) => message,
-                Err(error) => RESPDataType::SimpleError(error),
-            }
-            .encode();
+            let command: Result<Command, SimpleError> = request.try_into();
+            let response = match command {
+                Ok(Command::Ping) => SimpleString::new("PONG").encode(),
+                Ok(Command::Echo(message)) => message.encode(),
+                Err(error) => error.encode(),
+            };
 
             if let Ok(response) = String::from_utf8(response.clone()) {
                 dbg!(response);
