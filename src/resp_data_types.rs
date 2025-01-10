@@ -6,10 +6,6 @@ pub struct SimpleError<'a> {
 }
 
 impl SimpleError<'_> {
-    pub const fn new(inner: &str) -> SimpleError<'_> {
-        SimpleError { inner }
-    }
-
     pub fn encode(&self) -> Vec<u8> {
         // 1 for type
         // 2 for terminator
@@ -19,6 +15,12 @@ impl SimpleError<'_> {
         value.extend_from_slice(b"\r\n");
 
         value
+    }
+}
+
+impl<'a> From<&'a str> for SimpleError<'a> {
+    fn from(inner: &'a str) -> Self {
+        Self { inner }
     }
 }
 
@@ -146,10 +148,7 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
                 }),
                 b'-' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
-                    Ok((
-                        RESPDataType::SimpleError(SimpleError::new(result)),
-                        &value[cr + 2..],
-                    ))
+                    Ok((RESPDataType::SimpleError(result.into()), &value[cr + 2..]))
                 }),
                 b'$' => {
                     let (length, remaining) = find_crlf!(value, |cr| find_length!(value, cr))?;
@@ -305,7 +304,7 @@ mod test {
 
         assert_eq!(
             result,
-            RESPDataType::SimpleError(SimpleError::new("ERR unknown command 'asdf'"))
+            RESPDataType::SimpleError("ERR unknown command 'asdf'".into())
         );
 
         Ok(())
