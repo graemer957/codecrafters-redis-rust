@@ -46,16 +46,18 @@ impl SimpleString<'_> {
     }
 }
 
+impl<'a> From<&'a str> for SimpleString<'a> {
+    fn from(inner: &'a str) -> Self {
+        Self { inner }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct BulkString<'a> {
     inner: &'a [u8],
 }
 
 impl BulkString<'_> {
-    pub const fn new(inner: &[u8]) -> BulkString<'_> {
-        BulkString { inner }
-    }
-
     pub fn encode(&self) -> Vec<u8> {
         // TODO: Idiomatic way to convert usize to &[u8]?
         let mut value = Vec::new();
@@ -69,6 +71,12 @@ impl BulkString<'_> {
 
     pub fn as_string(&self) -> Option<&str> {
         std::str::from_utf8(self.inner).ok()
+    }
+}
+
+impl<'a> From<&'a [u8]> for BulkString<'a> {
+    fn from(inner: &'a [u8]) -> Self {
+        Self { inner }
     }
 }
 
@@ -141,10 +149,7 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
             match value[0] {
                 b'+' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
-                    Ok((
-                        RESPDataType::SimpleString(SimpleString::new(result)),
-                        &value[cr + 2..],
-                    ))
+                    Ok((RESPDataType::SimpleString(result.into()), &value[cr + 2..]))
                 }),
                 b'-' => find_crlf!(value, |cr| {
                     let result = str::from_utf8(&value[1..cr]).map_err(|_| Error::InvalidUTF8)?;
@@ -156,10 +161,7 @@ impl<'a> TryFrom<&'a [u8]> for RESPDataType<'a> {
                     find_crlf!(remaining, |cr| {
                         let value = &remaining[..cr];
                         if value.len() == length as usize {
-                            Ok((
-                                RESPDataType::BulkString(BulkString::new(value)),
-                                &remaining[cr + 2..],
-                            ))
+                            Ok((RESPDataType::BulkString(value.into()), &remaining[cr + 2..]))
                         } else {
                             Err(Error::InvalidLength)
                         }
@@ -216,7 +218,7 @@ mod test {
         let input: &[u8] = b"+OK\r\n";
         let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RESPDataType::SimpleString(SimpleString::new("OK")));
+        assert_eq!(result, RESPDataType::SimpleString("OK".into()));
 
         Ok(())
     }
@@ -226,7 +228,7 @@ mod test {
         let input: &[u8] = b"$4\r\nRust\r\n";
         let result = RESPDataType::try_from(input)?;
 
-        assert_eq!(result, RESPDataType::BulkString(BulkString::new(b"Rust")));
+        assert_eq!(result, RESPDataType::BulkString(b"Rust"[..].into()));
 
         Ok(())
     }
@@ -253,9 +255,9 @@ mod test {
 
         assert_eq!(
             result,
-            RESPDataType::Array(VecDeque::from([RESPDataType::BulkString(BulkString::new(
-                b"PING"
-            ))]))
+            RESPDataType::Array(VecDeque::from([RESPDataType::BulkString(
+                b"PING"[..].into()
+            )]))
         );
 
         Ok(())
@@ -269,8 +271,8 @@ mod test {
         assert_eq!(
             result,
             RESPDataType::Array(VecDeque::from([
-                RESPDataType::BulkString(BulkString::new(b"PING")),
-                RESPDataType::SimpleString(SimpleString::new("OK"))
+                RESPDataType::BulkString(b"PING"[..].into()),
+                RESPDataType::SimpleString("OK".into())
             ]))
         );
 
