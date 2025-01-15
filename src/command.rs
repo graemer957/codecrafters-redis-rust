@@ -21,7 +21,7 @@ impl<'a> TryFrom<RESPDataType<'a>> for Command<'a> {
             return Err("ERR command is not valid UTF8");
         };
 
-        match command.as_bytes() {
+        match command.to_uppercase().as_bytes() {
             b"PING" => Ok(Self::Ping),
 
             // ECHO
