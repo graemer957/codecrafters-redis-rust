@@ -1,6 +1,6 @@
 use crate::{
     command::Command,
-    resp_data_types::{RESPDataType, SimpleError, SimpleString},
+    resp::{RespType, SimpleError, SimpleString},
 };
 use anyhow::Result;
 use std::{
@@ -50,7 +50,7 @@ impl Client {
                 dbg!(request);
             }
 
-            let request: RESPDataType = self.request_buffer.as_slice().try_into()?;
+            let request: RespType = self.request_buffer.as_slice().try_into()?;
             let response = match request.try_into() {
                 Ok(command) => match command {
                     Command::Ping => SimpleString::new("PONG").encode(),

@@ -1,6 +1,6 @@
 mod client;
 mod command;
-mod resp_data_types;
+mod resp;
 mod server;
 mod threadpool;
 
