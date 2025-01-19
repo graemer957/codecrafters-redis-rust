@@ -88,7 +88,7 @@ impl<'a> From<&'a [u8]> for BulkString<'a> {
 pub struct NullBulkString;
 
 impl NullBulkString {
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode() -> Vec<u8> {
         b"$-1\r\n".to_vec()
     }
 }

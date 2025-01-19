@@ -12,9 +12,9 @@ impl Store {
         }
     }
 
-    pub fn get(&self, key: String) -> Option<Vec<u8>> {
+    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         println!("getting value for {key:?}");
-        self.inner.lock().ok()?.get(&key).cloned()
+        self.inner.lock().ok()?.get(key).cloned()
     }
 
     pub fn set(&self, key: String, value: Vec<u8>) {

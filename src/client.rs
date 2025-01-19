@@ -68,17 +68,13 @@ impl Client {
                             SimpleError::from("ERR key is not UTF8 string").encode()
                         }
                     }
-                    Command::Get(key) => {
-                        if let Some(value) = self
-                            .store
-                            .get(key.as_string().unwrap_or_default().to_string())
-                        {
-                            let response: BulkString = value.as_slice().into();
-                            response.encode()
-                        } else {
-                            NullBulkString.encode()
-                        }
-                    }
+                    Command::Get(key) => self
+                        .store
+                        .get(key.as_string().unwrap_or_default())
+                        .map_or_else(NullBulkString::encode, |value| {
+                            let value: BulkString = value.as_slice().into();
+                            value.encode()
+                        }),
                 },
                 Err(error) => Into::<SimpleError>::into(error).encode(),
             };
