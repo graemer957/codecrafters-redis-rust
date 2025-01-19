@@ -1,6 +1,6 @@
 use crate::{
     command::Command,
-    resp::{BulkString, RespType, SimpleError, SimpleString},
+    resp::{BulkString, NullBulkString, RespType, SimpleError, SimpleString},
     store::Store,
 };
 use anyhow::Result;
@@ -76,7 +76,7 @@ impl Client {
                             let response: BulkString = value.as_slice().into();
                             response.encode()
                         } else {
-                            SimpleError::from("ERR no value for key").encode()
+                            NullBulkString.encode()
                         }
                     }
                 },

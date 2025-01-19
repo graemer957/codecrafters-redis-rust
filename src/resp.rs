@@ -84,6 +84,15 @@ impl<'a> From<&'a [u8]> for BulkString<'a> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct NullBulkString;
+
+impl NullBulkString {
+    pub fn encode(&self) -> Vec<u8> {
+        b"$-1\r\n".to_vec()
+    }
+}
+
 // This is needed to support the heterogeneous arrays used in RESP
 // See https://redis.io/docs/latest/develop/reference/protocol-spec/#arrays
 #[derive(Debug, PartialEq, Eq)]
