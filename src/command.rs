@@ -23,12 +23,12 @@ impl<'a> TryFrom<RespType<'a>> for Command<'a> {
             return Err("ERR command is not valid UTF8");
         };
 
-        match command.to_uppercase().as_bytes() {
-            b"PING" => Ok(Self::Ping),
+        match command {
+            x if x.eq_ignore_ascii_case("ping") => Ok(Self::Ping),
 
             // ECHO
             // See: https://redis.io/docs/latest/commands/echo/
-            b"ECHO" => {
+            x if x.eq_ignore_ascii_case("echo") => {
                 if let Some(RespType::BulkString(message)) = array.pop_front() {
                     Ok(Command::Echo(message))
                 } else {
@@ -38,7 +38,7 @@ impl<'a> TryFrom<RespType<'a>> for Command<'a> {
 
             // SET
             // See: https://redis.io/docs/latest/commands/set/
-            b"SET" => {
+            x if x.eq_ignore_ascii_case("set") => {
                 let Some(RespType::BulkString(key)) = array.pop_front() else {
                     return Err("ERR missing or incorrectly formatted key");
                 };
@@ -52,7 +52,7 @@ impl<'a> TryFrom<RespType<'a>> for Command<'a> {
 
             // GET
             // See: https://redis.io/docs/latest/commands/get/
-            b"GET" => {
+            x if x.eq_ignore_ascii_case("get") => {
                 let Some(RespType::BulkString(key)) = array.pop_front() else {
                     return Err("ERR missing or incorrectly formatted key");
                 };
