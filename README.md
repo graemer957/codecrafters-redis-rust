@@ -43,3 +43,5 @@ project more elegant / reusable / etc, but do not have the time for right now:
     more battle tested like `Tokio` or `Rayon`
     - No support for `Result` currently, so we are ignoring
 - [ ] What is the idiomatic way to get a `&[u8]` from a `usize`?
+- [ ] `Client` and `Command` work using zero-copy, but interactions with the `Store` copy. I am
+    confident this could be improved

@@ -3,6 +3,8 @@ use crate::resp::{BulkString, RespType};
 pub enum Command<'a> {
     Ping,
     Echo(BulkString<'a>),
+    Set(BulkString<'a>, BulkString<'a>),
+    Get(BulkString<'a>),
 }
 
 impl<'a> TryFrom<RespType<'a>> for Command<'a> {
@@ -32,6 +34,30 @@ impl<'a> TryFrom<RespType<'a>> for Command<'a> {
                 } else {
                     Err("ERR nothing to echo back")
                 }
+            }
+
+            // SET
+            // See: https://redis.io/docs/latest/commands/set/
+            b"SET" => {
+                let Some(RespType::BulkString(key)) = array.pop_front() else {
+                    return Err("ERR missing or incorrectly formatted key");
+                };
+
+                let Some(RespType::BulkString(value)) = array.pop_front() else {
+                    return Err("ERR missing or incorrectly formatted value");
+                };
+
+                Ok(Command::Set(key, value))
+            }
+
+            // GET
+            // See: https://redis.io/docs/latest/commands/get/
+            b"GET" => {
+                let Some(RespType::BulkString(key)) = array.pop_front() else {
+                    return Err("ERR missing or incorrectly formatted key");
+                };
+
+                Ok(Command::Get(key))
             }
 
             _ => Err("ERR unknown command"),

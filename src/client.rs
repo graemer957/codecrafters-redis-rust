@@ -1,23 +1,27 @@
 use crate::{
     command::Command,
-    resp::{RespType, SimpleError, SimpleString},
+    resp::{BulkString, RespType, SimpleError, SimpleString},
+    store::Store,
 };
 use anyhow::Result;
 use std::{
     io::{Read, Write},
     net::{Shutdown, TcpStream},
+    sync::Arc,
 };
 
 pub struct Client {
     stream: TcpStream,
     request_buffer: Vec<u8>,
+    store: Arc<Store>,
 }
 
 impl Client {
-    pub const fn new(stream: TcpStream) -> Self {
+    pub const fn new(stream: TcpStream, store: Arc<Store>) -> Self {
         Self {
             stream,
             request_buffer: Vec::new(),
+            store,
         }
     }
 
@@ -55,6 +59,26 @@ impl Client {
                 Ok(command) => match command {
                     Command::Ping => SimpleString::new("PONG").encode(),
                     Command::Echo(message) => message.encode(),
+                    Command::Set(key, value) => {
+                        if let Some(key) = key.as_string() {
+                            // TODO: Are copies for key/value needed?
+                            self.store.set(key.to_string(), value.to_vec());
+                            SimpleString::new("OK").encode()
+                        } else {
+                            SimpleError::from("ERR key is not UTF8 string").encode()
+                        }
+                    }
+                    Command::Get(key) => {
+                        if let Some(value) = self
+                            .store
+                            .get(key.as_string().unwrap_or_default().to_string())
+                        {
+                            let response: BulkString = value.as_slice().into();
+                            response.encode()
+                        } else {
+                            SimpleError::from("ERR no value for key").encode()
+                        }
+                    }
                 },
                 Err(error) => Into::<SimpleError>::into(error).encode(),
             };

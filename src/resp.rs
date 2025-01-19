@@ -72,6 +72,10 @@ impl BulkString<'_> {
     pub fn as_string(&self) -> Option<&str> {
         std::str::from_utf8(self.inner).ok()
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.inner.to_vec()
+    }
 }
 
 impl<'a> From<&'a [u8]> for BulkString<'a> {
