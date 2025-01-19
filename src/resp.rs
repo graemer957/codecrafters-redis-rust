@@ -70,7 +70,7 @@ impl BulkString<'_> {
     }
 
     pub fn as_string(&self) -> Option<&str> {
-        std::str::from_utf8(self.inner).ok()
+        str::from_utf8(self.inner).ok()
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
@@ -144,7 +144,7 @@ macro_rules! find_crlf {
 macro_rules! find_length {
     ($value:expr, $cr:expr) => {{
         // TODO: &[u8] -> &str -> parse
-        let length = std::str::from_utf8(&$value[1..$cr])
+        let length = str::from_utf8(&$value[1..$cr])
             .map_err(|_| Error::InvalidUTF8)?
             .parse::<u32>()
             .map_err(|_| Error::InvalidUnsigned32BitNumber)?;

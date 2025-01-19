@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::sync::Mutex;
+use std::{collections::HashMap, str, sync::Mutex};
 
 pub struct Store {
     inner: Mutex<HashMap<String, Vec<u8>>>,
@@ -18,7 +17,7 @@ impl Store {
     }
 
     pub fn set(&self, key: String, value: Vec<u8>) {
-        if let Ok(value) = String::from_utf8(value.clone()) {
+        if let Ok(value) = str::from_utf8(value.as_slice()) {
             println!("setting '{value}' for '{key}'");
         } else {
             println!("setting binary value for '{key}'");

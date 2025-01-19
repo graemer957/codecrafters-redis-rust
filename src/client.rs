@@ -7,6 +7,7 @@ use anyhow::Result;
 use std::{
     io::{Read, Write},
     net::{Shutdown, TcpStream},
+    str,
     sync::Arc,
 };
 
@@ -50,7 +51,7 @@ impl Client {
                 }
             }
 
-            if let Ok(request) = String::from_utf8(self.request_buffer.clone()) {
+            if let Ok(request) = str::from_utf8(self.request_buffer.as_slice()) {
                 dbg!(request);
             }
 
@@ -79,7 +80,7 @@ impl Client {
                 Err(error) => Into::<SimpleError>::into(error).encode(),
             };
 
-            if let Ok(response) = String::from_utf8(response.clone()) {
+            if let Ok(response) = str::from_utf8(response.as_slice()) {
                 dbg!(response);
             }
             self.stream.write_all(response.as_slice())?;
