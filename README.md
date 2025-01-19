@@ -38,7 +38,7 @@ Note: This section is for stages 2 and beyond.
 This is a collection of TODOs of possible improvements/refactors that I feel would make this
 project more elegant / reusable / etc, but do not have the time for right now:
 - [ ] What is the idiomatic way to take a `&[u8]` of digits and convert to `u32`?
-    - Currently converting to `String` and then `parse::<u32>`, feels like there is a better way!
+    - Currently converting to `&str` and then `parse::<u32>`, feels like there is a better way!
 - [ ] `ThreadPool` is taken straight out of the Rust book and should probably look at something
     more battle tested like `Tokio` or `Rayon`
     - No support for `Result` currently, so we are ignoring

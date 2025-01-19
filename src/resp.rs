@@ -143,10 +143,9 @@ macro_rules! find_crlf {
 
 macro_rules! find_length {
     ($value:expr, $cr:expr) => {{
-        // TODO: &[u8] -> String -> parse
-        let length = &$value[1..$cr];
-        let string = String::from_utf8(length.to_vec()).map_err(|_| Error::InvalidUTF8)?;
-        let length = string
+        // TODO: &[u8] -> &str -> parse
+        let length = std::str::from_utf8(&$value[1..$cr])
+            .map_err(|_| Error::InvalidUTF8)?
             .parse::<u32>()
             .map_err(|_| Error::InvalidUnsigned32BitNumber)?;
 
