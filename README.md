@@ -45,3 +45,4 @@ project more elegant / reusable / etc, but do not have the time for right now:
 - [ ] What is the idiomatic way to get a `&[u8]` from a `usize`?
 - [ ] `Client` and `Command` work using zero-copy, but interactions with the `Store` copy. I am
     confident this could be improved
+- [ ] Use `RwLock` instead of `Mutux` for interior mutability for `Store`

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, str, sync::Mutex};
 
 pub struct Store {
+    // TODO: Use `RwLock` instead?
     inner: Mutex<HashMap<String, Vec<u8>>>,
 }
 
