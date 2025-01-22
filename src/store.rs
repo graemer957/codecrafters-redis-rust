@@ -1,8 +1,13 @@
-use std::{collections::HashMap, str, sync::Mutex};
+use std::{
+    collections::HashMap,
+    str,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 pub struct Store {
     // TODO: Use `RwLock` instead?
-    inner: Mutex<HashMap<String, Vec<u8>>>,
+    inner: Mutex<HashMap<String, Entry>>,
 }
 
 impl Store {
@@ -14,10 +19,23 @@ impl Store {
 
     pub fn get(&self, key: &str) -> Option<Vec<u8>> {
         println!("getting value for {key:?}");
-        self.inner.lock().ok()?.get(key).cloned()
+        let mut lock = self.inner.lock().ok()?;
+
+        match lock.get(key) {
+            Some(entry)
+                if entry.expires.is_some() && entry.expires.map(|ttl| ttl <= Instant::now())? =>
+            {
+                println!("removing value as expired...");
+                lock.remove(key);
+
+                None
+            }
+            Some(entry) => Some(entry.inner.clone()),
+            None => None,
+        }
     }
 
-    pub fn set(&self, key: String, value: Vec<u8>) {
+    pub fn set(&self, key: String, value: Vec<u8>, ttl: Option<Duration>) {
         if let Ok(value) = str::from_utf8(value.as_slice()) {
             println!("setting '{value}' for '{key}'");
         } else {
@@ -25,9 +43,26 @@ impl Store {
         }
 
         if let Ok(mut lock) = self.inner.lock() {
-            lock.insert(key, value);
+            let entry = Entry::new(value, ttl);
+            lock.insert(key, entry);
         } else {
             eprintln!("Unable to acquire lock on Store");
+        }
+    }
+}
+
+struct Entry {
+    inner: Vec<u8>,
+    expires: Option<Instant>,
+}
+
+impl Entry {
+    fn new(value: Vec<u8>, ttl: Option<Duration>) -> Self {
+        let expires = ttl.map(|ttl| Instant::now() + ttl);
+
+        Self {
+            inner: value,
+            expires,
         }
     }
 }

@@ -60,10 +60,10 @@ impl Client {
                 Ok(command) => match command {
                     Command::Ping => SimpleString::new("PONG").encode(),
                     Command::Echo(message) => message.encode(),
-                    Command::Set(key, value) => {
+                    Command::Set(key, value, ttl) => {
                         if let Some(key) = key.as_string() {
                             // TODO: Are copies for key/value needed?
-                            self.store.set(key.to_string(), value.to_vec());
+                            self.store.set(key.to_string(), value.to_vec(), ttl);
                             SimpleString::new("OK").encode()
                         } else {
                             SimpleError::from("ERR key is not UTF8 string").encode()

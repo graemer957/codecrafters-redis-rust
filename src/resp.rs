@@ -76,6 +76,11 @@ impl BulkString<'_> {
     pub fn to_vec(&self) -> Vec<u8> {
         self.inner.to_vec()
     }
+
+    pub fn as_u64(&self) -> Option<u64> {
+        self.as_string()
+            .and_then(|value| str::parse::<u64>(value).ok())
+    }
 }
 
 impl<'a> From<&'a [u8]> for BulkString<'a> {
