@@ -137,7 +137,7 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 macro_rules! find_crlf {
-    ($value:expr, $on_found:expr) => {
+    ($value:expr_2021, $on_found:expr_2021) => {
         if let Some(cr) = $value.windows(2).position(|x| x == b"\r\n") {
             $on_found(cr)
         } else {
@@ -147,7 +147,7 @@ macro_rules! find_crlf {
 }
 
 macro_rules! find_length {
-    ($value:expr, $cr:expr) => {{
+    ($value:expr_2021, $cr:expr_2021) => {{
         // TODO: &[u8] -> &str -> parse
         let length = str::from_utf8(&$value[1..$cr])
             .map_err(|_| Error::InvalidUTF8)?

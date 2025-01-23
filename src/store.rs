@@ -42,11 +42,14 @@ impl Store {
             println!("setting binary value for '{key}'");
         }
 
-        if let Ok(mut lock) = self.inner.lock() {
-            let entry = Entry::new(value, ttl);
-            lock.insert(key, entry);
-        } else {
-            eprintln!("Unable to acquire lock on Store");
+        match self.inner.lock() {
+            Ok(mut lock) => {
+                let entry = Entry::new(value, ttl);
+                lock.insert(key, entry);
+            }
+            _ => {
+                eprintln!("Unable to acquire lock on Store");
+            }
         }
     }
 }
