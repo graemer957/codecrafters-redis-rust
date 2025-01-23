@@ -53,7 +53,7 @@ impl<'a> TryFrom<RespType<'a>> for Command<'a> {
                     let RespType::BulkString(string) = option else {
                         // TODO: It may be possible to mix and match, but not seeing this in
                         // tests from CodeCrafters thus far
-                        return Err("ERR expecting BulkString got {option:?}");
+                        return Err("ERR expecting BulkString for option");
                     };
 
                     match string.as_string() {
